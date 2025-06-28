@@ -1,0 +1,47 @@
+name: OWASP ZAP Scan
+
+on:
+  workflow_dispatch:  # memungkinkan kamu menjalankan manual dari GitHub UI
+
+jobs:
+  zap:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download OWASP ZAP Docker image
+        run: docker pull zaproxy/zap-stable
+
+      - name: Run ZAP Baseline Scan against Vercel URL
+        env:
+          TARGET_URL: https://nextfolio-a-simple-next-js-portfolio.vercel.app  # Ganti ke URL deploy-mu di Vercel
+        run: |
+          TIMESTAMP=$(date +%s)
+          REPORT_NAME="zap-report-${TIMESTAMP}.html"
+          echo "Report will be saved as: $REPORT_NAME"
+          echo "Scanning target: $TARGET_URL"
+          
+          mkdir -p "$HOME/zap-reports"
+          echo "Report directory: $HOME/zap-reports"
+
+          docker run --rm \
+            --user root \
+            -v "$HOME/zap-reports":/zap/wrk \
+            zaproxy/zap-stable \
+            zap-baseline.py \
+            -t "$TARGET_URL" \
+            -r "$REPORT_NAME" \
+            -I
+
+          echo "REPORT_NAME=${REPORT_NAME}" >> $GITHUB_ENV
+          echo "REPORT_LOCATION=$HOME/zap-reports" >> $GITHUB_ENV
+
+      - name: Show which report we'll upload
+        run: |
+          echo "Uploading report: ${{ env.REPORT_NAME }}"
+
+      - name: Upload ZAP HTML Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: ${{ env.REPORT_LOCATION }}/${{ env.REPORT_NAME }}
